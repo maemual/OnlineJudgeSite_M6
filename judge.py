@@ -108,7 +108,7 @@ def _get_result():
         result['status'] = result_file.readline().strip('\n')
         result['run_time'] = result_file.readline().strip('\n')
         result['run_memory'] = result_file.readline().strip('\n')
-        result['extra_message'] = result.read()
+        result['extra_message'] = result_file.read()
 
     return result
 
