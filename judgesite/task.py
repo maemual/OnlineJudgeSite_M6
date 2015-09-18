@@ -8,7 +8,7 @@ import shutil
 import subprocess
 import os
 
-from config import conf
+from . import config
 from models import save_result
 
 
@@ -57,12 +57,12 @@ class JudgeTask(object):
 
     def _prepare_temp_dir(self):
         logging.info("Prepare temp dir")
-        os.mkdir(conf.tmp_path)
+        os.mkdir(config.tmp_path)
 
     def _dump_code_to_file(self):
         logging.info("Dump code to file")
         filename = "Main." + self.language
-        self.code_file = os.path.join(conf.tmp_path, filename)
+        self.code_file = os.path.join(config.tmp_path, filename)
         code_file = io.open(self.code_file, 'w', encoding='utf8')
         code_file.write(self.code)
         code_file.close()
@@ -70,25 +70,25 @@ class JudgeTask(object):
     def _prepare_testdata_file(self):
         logging.info("Prepare testdata")
         input_file = os.path.join(
-            conf.testdata_path, self.testdata_id, "in.in")
+            config.testdata_path, self.testdata_id, "in.in")
         output_file = os.path.join(
-            conf.testdata_path, self.testdata_id, "out.out")
+            config.testdata_path, self.testdata_id, "out.out")
         if not os.path.exists(input_file) or not os.path.exists(output_file):
             raise NoTestDataException
-        shutil.copy(input_file, conf.tmp_path)
-        shutil.copy(output_file, conf.tmp_path)
+        shutil.copy(input_file, config.tmp_path)
+        shutil.copy(output_file, config.tmp_path)
 
     def _run(self):
         logging.info("GO!GO!GO!")
         commands = ["sudo", "./Core", "-c", self.code_file, "-t",
                     self.time_limit, "-m", self.memory_limit, "-d",
-                    conf.tmp_path]
+                    config.tmp_path]
 
         subprocess.call(commands)
 
     def _read_result(self):
         logging.info("Read result")
-        result_file = open(os.path.join(conf.tmp_path, "result.txt"), 'r')
+        result_file = open(os.path.join(config.tmp_path, "result.txt"), 'r')
         self.result = result_file.readline().strip()
         self.run_time = result_file.readline().strip()
         self.run_memory = result_file.readline().strip()
@@ -105,5 +105,5 @@ class JudgeTask(object):
 
     def _clean_files(self):
         logging.info("Clean files")
-        if os.path.exists(conf.tmp_path):
-            shutil.rmtree(conf.tmp_path)
+        if os.path.exists(config.tmp_path):
+            shutil.rmtree(config.tmp_path)
