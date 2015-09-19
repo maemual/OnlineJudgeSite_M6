@@ -5,6 +5,7 @@ import logging
 import io
 import json
 import subprocess
+import shutil
 import tempfile
 import os
 
@@ -41,16 +42,14 @@ class JudgeTask(object):
             self.result = 'NoTestDataError'
             self._save_result()
             return
-        logging.info(1)
+
         try:
             self._run()
-        except Exception as e:
-            logging.error(e)
-            logging.info(2)
+        except Exception:
             self.result = "System Error"
             self._save_result()
             return
-        logging.info(3)
+        self._clean_files()
 
         self._read_result()
 
@@ -118,3 +117,6 @@ class JudgeTask(object):
                     run_memory=self.run_memory,
                     compiler_output=self.others,
                     status=self.result)
+
+    def _clean_files(self):
+        shutil.rmtree(os.path.dirname(self.code_file))
