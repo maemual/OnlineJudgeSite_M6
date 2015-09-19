@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 
 testdata_path = ""
-tmp_path = ""
 mysql_user = ""
 mysql_password = ""
 mysql_host = ""
@@ -14,3 +13,4 @@ rmq_user = "guest"
 rmq_password = "guest"
 access_key = ""
 api_url = ""
+

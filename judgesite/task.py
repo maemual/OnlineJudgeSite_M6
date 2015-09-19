@@ -4,8 +4,8 @@
 import logging
 import io
 import json
-import shutil
 import subprocess
+import tempfile
 import os
 
 from . import config
@@ -34,65 +34,81 @@ class JudgeTask(object):
         self.others = ""
 
     def go(self):
-        self._clean_files()
-
+        self._dump_code_to_file()
         try:
-            self._prepare_temp_dir()
-
-            self._dump_code_to_file()
-
             self._prepare_testdata_file()
         except NoTestDataException, e:
             self.result = 'NoTestDataError'
-        except Exception, e:
-            raise e
-        else:
+            self._save_result()
+            return
+        logging.info(1)
+        try:
             self._run()
+        except Exception as e:
+            logging.error(e)
+            logging.info(2)
+            self.result = "System Error"
+            self._save_result()
+            return
+        logging.info(3)
 
-            self._read_result()
+        self._read_result()
 
         self._save_result()
-
-        self._clean_files()
-
-    def _prepare_temp_dir(self):
-        logging.info("Prepare temp dir")
-        os.mkdir(config.tmp_path)
 
     def _dump_code_to_file(self):
         logging.info("Dump code to file")
         filename = "Main." + self.language
-        self.code_file = os.path.join(config.tmp_path, filename)
+        self.code_file = os.path.join(tempfile.mkdtemp(), filename)
         code_file = io.open(self.code_file, 'w', encoding='utf8')
         code_file.write(self.code)
         code_file.close()
 
     def _prepare_testdata_file(self):
         logging.info("Prepare testdata")
-        input_file = os.path.join(
+        self.input_file = os.path.join(
             config.testdata_path, self.testdata_id, "in.in")
-        output_file = os.path.join(
+        self.output_file = os.path.join(
             config.testdata_path, self.testdata_id, "out.out")
-        if not os.path.exists(input_file) or not os.path.exists(output_file):
+        if not os.path.exists(self.input_file) or\
+                not os.path.exists(self.output_file):
             raise NoTestDataException
-        shutil.copy(input_file, config.tmp_path)
-        shutil.copy(output_file, config.tmp_path)
 
     def _run(self):
         logging.info("GO!GO!GO!")
-        commands = ["sudo", "./Core", "-c", self.code_file, "-t",
-                    self.time_limit, "-m", self.memory_limit, "-d",
-                    config.tmp_path]
-
-        subprocess.call(commands)
+        commands = ["ljudge", "--max-cpu-time", str(float(self.time_limit) / 1000),
+                    "--max-memory", str(int(self.memory_limit) * 1024),
+                    "--user-code", self.code_file,
+                    "--testcase",
+                    "--input", self.input_file,
+                    "--output", self.output_file]
+        self.output_result = subprocess.check_output(commands)
 
     def _read_result(self):
         logging.info("Read result")
-        result_file = open(os.path.join(config.tmp_path, "result.txt"), 'r')
-        self.result = result_file.readline().strip()
-        self.run_time = result_file.readline().strip()
-        self.run_memory = result_file.readline().strip()
-        self.others = result_file.read()
+        result = json.loads(self.output_result)
+        if not result['compilation']['success']:
+            self.result = "Compile Error"
+            self.others = result['compilation']['log']
+            return
+        if result['testcases'][0]['result'] == "ACCEPTED":
+            self.result = "Accepted"
+            self.run_time = result['testcases'][0]['time'] * 1000
+            self.run_memory = result['testcases'][0]['memory'] / 1024.0
+            return
+        if result['testcases'][0]['result'] == "WRONG_ANSWER":
+            self.result = "Wrong Answer"
+            return
+        if result['testcases'][0]['result'] == "TIME_LIMIT_EXCEEDED":
+            self.result = "Time Limit Exceeded"
+            return
+        if result['testcases'][0]['result'] == "MEMORY_LIMIT_EXCEEDED":
+            self.result = "Memory Limit Exceeded"
+            return
+        if result['testcases'][0]['result'] == "PRESENTATION_ERROR":
+            self.result = "Presentation Error"
+            return
+        self.result = "Runtime Error"
 
     def _save_result(self):
         logging.info("Save result")
@@ -102,8 +118,3 @@ class JudgeTask(object):
                     run_memory=self.run_memory,
                     compiler_output=self.others,
                     status=self.result)
-
-    def _clean_files(self):
-        logging.info("Clean files")
-        if os.path.exists(config.tmp_path):
-            shutil.rmtree(config.tmp_path)
